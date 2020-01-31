@@ -6970,11 +6970,6 @@ public class FirOldFrontendDiagnosticsTestGenerated extends AbstractFirOldFronte
                 runTest("compiler/testData/diagnostics/tests/duplicateJvmSignature/specialNames/dataClassCopy.kt");
             }
 
-            @TestMetadata("defaults.kt")
-            public void testDefaults() throws Exception {
-                runTest("compiler/testData/diagnostics/tests/duplicateJvmSignature/specialNames/defaults.kt");
-            }
-
             @TestMetadata("delegationBy.kt")
             public void testDelegationBy() throws Exception {
                 runTest("compiler/testData/diagnostics/tests/duplicateJvmSignature/specialNames/delegationBy.kt");

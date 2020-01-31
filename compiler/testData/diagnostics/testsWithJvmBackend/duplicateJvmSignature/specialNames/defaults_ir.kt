@@ -1,6 +1,7 @@
+// TARGET_BACKEND: JVM_IR
 // !DIAGNOSTICS: -UNUSED_PARAMETER
 
-class C {
+class <!CONFLICTING_JVM_DECLARATIONS!>C<!> {
     <!CONFLICTING_JVM_DECLARATIONS!>fun `a$default`(c: C, x: Int, m: Int, mh: Any)<!> {}
-    <!CONFLICTING_JVM_DECLARATIONS!>fun a(x: Int = 1)<!> {}
+    fun a(x: Int = 1) {}
 }

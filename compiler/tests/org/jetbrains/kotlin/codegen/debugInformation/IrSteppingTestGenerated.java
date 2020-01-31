@@ -32,6 +32,12 @@ public class IrSteppingTestGenerated extends AbstractIrSteppingTest {
     }
 
     @Test
+    @TestMetadata("assertion.kt")
+    public void testAssertion() throws Exception {
+        runTest("compiler/testData/debug/stepping/assertion.kt");
+    }
+
+    @Test
     @TestMetadata("callableReference.kt")
     public void testCallableReference() throws Exception {
         runTest("compiler/testData/debug/stepping/callableReference.kt");

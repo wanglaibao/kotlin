@@ -133,14 +133,15 @@ abstract class InlineCodegen<out T : BaseExpressionCodegen>(
         inlineDefaultLambdas: Boolean,
         mapDefaultSignature: Boolean,
         typeSystem: TypeSystemCommonBackendContext,
-        registerLineNumberAfterwards: Boolean
+        registerLineNumberAfterwards: Boolean,
+        isSyntheticCall: Boolean
     ) {
         var nodeAndSmap: SMAPAndMethodNode? = null
         try {
             nodeAndSmap = createInlineMethodNode(
                 functionDescriptor, methodOwner, jvmSignature, mapDefaultSignature, typeArguments, typeSystem, state, sourceCompiler
             )
-            endCall(inlineCall(nodeAndSmap, inlineDefaultLambdas), registerLineNumberAfterwards)
+            endCall(inlineCall(nodeAndSmap, inlineDefaultLambdas, isSyntheticCall), registerLineNumberAfterwards)
         } catch (e: CompilationException) {
             throw e
         } catch (e: InlineException) {
@@ -206,9 +207,9 @@ abstract class InlineCodegen<out T : BaseExpressionCodegen>(
                 ?: error("No stack value for continuation parameter of suspend function")
     }
 
-    protected fun inlineCall(nodeAndSmap: SMAPAndMethodNode, inlineDefaultLambda: Boolean): InlineResult {
+    protected fun inlineCall(nodeAndSmap: SMAPAndMethodNode, inlineDefaultLambda: Boolean, isSyntheticCall: Boolean): InlineResult {
         assert(delayedHiddenWriting == null) { "'putHiddenParamsIntoLocals' should be called after 'processAndPutHiddenParameters(true)'" }
-        defaultSourceMapper.callSiteMarker = CallSiteMarker(codegen.lastLineNumber)
+        if (!isSyntheticCall) defaultSourceMapper.callSiteMarker = CallSiteMarker(codegen.lastLineNumber)
         val node = nodeAndSmap.node
         if (inlineDefaultLambda) {
             for (lambda in extractDefaultLambdas(node)) {
@@ -270,7 +271,7 @@ abstract class InlineCodegen<out T : BaseExpressionCodegen>(
             addInlineMarker(codegen.v, false)
         }
 
-        defaultSourceMapper.callSiteMarker = null
+        if (!isSyntheticCall) defaultSourceMapper.callSiteMarker = null
 
         return result
     }

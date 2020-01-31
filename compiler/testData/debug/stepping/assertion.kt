@@ -1,8 +1,4 @@
-
-// FILE: 1.kt
-
-package test
-
+// FILE: test.kt
 public val MASSERTIONS_ENABLED: Boolean = true
 
 public inline fun massert(value: Boolean, lazyMessage: () -> String) {
@@ -23,10 +19,6 @@ public inline fun massert(value: Boolean, message: Any = "Assertion failed") {
     }
 }
 
-// FILE: 2.kt
-
-import test.*
-
 fun box(): String {
     massert(true)
     massert(true) {
@@ -36,41 +28,18 @@ fun box(): String {
     return "OK"
 }
 
-// FILE: 1.smap
-//TODO maybe do smth with default method body mapping
-SMAP
-1.kt
-Kotlin
-*S Kotlin
-*F
-+ 1 1.kt
-test/_1Kt
-*L
-1#1,26:1
-19#1,6:27
-*E
-
-// FILE: 2.smap
-
-SMAP
-2.kt
-Kotlin
-*S Kotlin
-*F
-+ 1 2.kt
-_2Kt
-+ 2 1.kt
-test/_1Kt
-*L
-1#1,14:1
-18#2,7:15
-9#2,7:22
-*E
-*S KotlinDebug
-*F
-+ 1 2.kt
-_2Kt
-*L
-6#1,7:15
-7#1,7:22
-*E
+// LINENUMBERS
+// TestKt.box():23
+// TestKt.box():14
+// TestKt.box():15
+// TestKt.getMASSERTIONS_ENABLED():2
+// TestKt.box():15
+// TestKt.box():16
+// TestKt.box():20
+// TestKt.box():24
+// TestKt.box():5
+// TestKt.getMASSERTIONS_ENABLED():2
+// TestKt.box():5
+// TestKt.box():6
+// TestKt.box():11
+// TestKt.box():28
