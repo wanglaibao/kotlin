@@ -6,12 +6,14 @@
 package org.jetbrains.kotlin.idea.codeInsight.gradle
 
 import com.intellij.openapi.vfs.LocalFileSystem
+import junit.framework.AssertionFailedError
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
 import org.jetbrains.kotlin.idea.core.script.applySuggestedScriptConfiguration
 import org.jetbrains.kotlin.idea.core.script.configuration.cache.ScriptConfigurationCacheScope
 import org.jetbrains.kotlin.idea.core.script.configuration.utils.areSimilar
 import org.jetbrains.kotlin.idea.core.script.configuration.utils.getKtFile
 import org.jetbrains.kotlin.idea.core.script.hasSuggestedScriptConfiguration
+import org.jetbrains.kotlin.idea.scripting.gradle.importing.gradle_build_script_errors
 import org.jetbrains.kotlin.scripting.resolve.ScriptCompilationConfigurationWrapper
 import org.jetbrains.kotlin.test.JUnitParameterizedWithIdeaConfigurationRunner
 import org.jetbrains.kotlin.test.RunnerFactoryWithMuteInDatabase
@@ -44,6 +46,21 @@ class GradleKtsImportTest : GradleImportingTestCase() {
     fun testEmpty() {
         configureByFiles()
         importProject()
+
+        checkConfiguration("build.gradle.kts")
+    }
+
+    @Test
+    @TargetVersions("6.0.1+")
+    fun testError() {
+        configureByFiles()
+        try {
+            importProject()
+        } catch (e: AssertionFailedError) {
+            if (e.message?.contains(gradle_build_script_errors) != true) {
+                throw e
+            }
+        }
 
         checkConfiguration("build.gradle.kts")
     }

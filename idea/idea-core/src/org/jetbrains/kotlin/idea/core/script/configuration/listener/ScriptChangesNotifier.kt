@@ -63,7 +63,9 @@ internal class ScriptChangesNotifier(
                     val file = FileDocumentManager.getInstance().getFile(document)?.takeIf { it.isInLocalFileSystem } ?: return
 
                     if (ApplicationManager.getApplication().isUnitTestMode) {
-                        getListener(project, file)?.documentChanged(file, updater)
+//                        ApplicationManager.getApplication().executeOnPooledThread {
+                            getListener(project, file)?.documentChanged(file, updater)
+//                        }
                     } else {
                         scriptsQueue.cancelAllRequests()
                         scriptsQueue.addRequest(

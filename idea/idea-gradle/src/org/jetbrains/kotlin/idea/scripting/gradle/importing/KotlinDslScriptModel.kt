@@ -5,17 +5,13 @@
 
 package org.jetbrains.kotlin.idea.scripting.gradle.importing
 
-import com.intellij.openapi.externalSystem.model.DataNode
-import com.intellij.openapi.externalSystem.model.project.ProjectData
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import org.jetbrains.kotlin.idea.util.NotNullableCopyableDataNodeUserDataProperty
+import org.jetbrains.kotlin.psi.NotNullableUserDataProperty
 
-var DataNode<out ProjectData>.KOTLIN_DSL_SCRIPT_MODELS: MutableList<KotlinDslScriptModel>
-        by NotNullableCopyableDataNodeUserDataProperty(
-            Key.create<MutableList<KotlinDslScriptModel>>(
-                "GRADLE_KOTLIN_BUILD_SCRIPTS"
-            ),
-            mutableListOf()
+var Project.KOTLIN_DSL_SCRIPT_MODELS: MutableList<KotlinDslScriptModel>
+        by NotNullableUserDataProperty(
+            Key.create("GRADLE_KOTLIN_BUILD_SCRIPTS"), mutableListOf()
         )
 
 data class KotlinDslScriptModel(
@@ -29,10 +25,24 @@ data class KotlinDslScriptModel(
     data class Message(
         val severity: Severity,
         val text: String,
-        val position: Position? = null
+        val details: String = "",
+        val position: Position?
     )
 
     data class Position(val line: Int, val column: Int)
 
     enum class Severity { WARNING, ERROR }
+}
+
+fun parsePositionFromException(e: String): Pair<String, KotlinDslScriptModel.Position>? {
+    //org.gradle.internal.exceptions.LocationAwareException: Build file '...\build.gradle.kts' line: 21
+    if (e.startsWith("org.gradle.internal.exceptions.LocationAwareException:")) {
+        val message = e.substringBefore(System.lineSeparator())
+        val file = message.substringAfter("Build file '").substringBefore("'")
+        val line = message.substringAfter("line: ").toIntOrNull()
+        if (file.isNotBlank() && line != null) {
+            return file to KotlinDslScriptModel.Position(line - 1, 0)
+        }
+    }
+    return null
 }
