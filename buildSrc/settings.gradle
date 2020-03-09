@@ -48,6 +48,7 @@ if (target_AppCode_Clion) {
     include ":prepare-deps:cocoa-common-binaries"
     include ":prepare-deps:lldb-framework"
     include ":prepare-deps:lldb-frontend"
+    include ":prepare-deps:native-debug-plugin"
 
     project(":prepare-deps:cocoa-common-binaries").projectDir =
             file("${buildProperties.propertiesProvider.rootProjectDir}/kotlin-ultimate/buildSrc/prepare-deps/cocoa-common-binaries")
@@ -55,6 +56,9 @@ if (target_AppCode_Clion) {
             file("${buildProperties.propertiesProvider.rootProjectDir}/kotlin-ultimate/buildSrc/prepare-deps/lldb-framework")
     project(":prepare-deps:lldb-frontend").projectDir =
             file("${buildProperties.propertiesProvider.rootProjectDir}/kotlin-ultimate/buildSrc/prepare-deps/lldb-frontend")
+    project(":prepare-deps:native-debug-plugin").projectDir =
+            file("${buildProperties.propertiesProvider.rootProjectDir}/kotlin-ultimate/buildSrc/prepare-deps/native-debug-plugin")
+
 } else if (target_IdeaUltimate) {
     logger.info("Including modules for IU in buildSrc/settings.gradle")
 
