@@ -38,7 +38,8 @@ fun KtExpression?.isTrueConstant() = this != null && node?.elementType == KtNode
 
 fun KtExpression?.isFalseConstant() = this != null && node?.elementType == KtNodeTypes.BOOLEAN_CONSTANT && text == "false"
 
-private val ZERO_VALUES = setOf(0, 0L, 0f, 0.0)
+@Suppress("RemoveRedundantCallsOfConversionMethods")
+private val ZERO_VALUES = setOf(0.toInt(), 0L, 0f, 0.0) // .toInt() conversion is workaround for KT-37302
 
 fun KtExpression.isZeroConstant(): Boolean {
     if (this !is KtConstantExpression) return false
