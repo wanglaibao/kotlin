@@ -7,7 +7,7 @@ buildscript {
 
     val cacheRedirectorEnabled = findProperty("cacheRedirectorEnabled")?.toString()?.toBoolean() == true
 
-    kotlinBootstrapFrom(BootstrapOption.BintrayDev("1.4.0-dev-4028", cacheRedirectorEnabled))
+    kotlinBootstrapFrom(BootstrapOption.BintrayDev("1.4.0-dev-4220", cacheRedirectorEnabled))
 
     repositories {
         bootstrapKotlinRepo?.let(::maven)
@@ -354,6 +354,7 @@ allprojects {
         "-Xopt-in=kotlin.RequiresOptIn",
         "-Xread-deserialized-contracts",
         "-Xjvm-default=compatibility",
+        "-Xno-optimized-callable-references",
         "-progressive".takeIf { hasProperty("test.progressive.mode") }
     )
 
