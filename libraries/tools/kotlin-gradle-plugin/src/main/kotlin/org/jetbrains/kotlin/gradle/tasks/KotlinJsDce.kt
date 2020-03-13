@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinJsDce
 import org.jetbrains.kotlin.gradle.dsl.KotlinJsDceOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinJsDceOptionsImpl
 import org.jetbrains.kotlin.gradle.logging.GradleKotlinLogger
-import org.jetbrains.kotlin.gradle.tasks.internal.GradleExecutionOperation
+import org.jetbrains.kotlin.gradle.tasks.internal.GradleExecOperationsHolder
 import org.jetbrains.kotlin.gradle.utils.canonicalPathWithoutExtension
 import java.io.File
 import org.jetbrains.kotlin.gradle.utils.isGradleVersionAtLeast
@@ -86,7 +86,7 @@ open class KotlinJsDce : AbstractKotlinCompileTool<K2JSDceArguments>(), KotlinJs
         val allArgs = argsArray + outputDirArgs + inputFiles
 
         if (isGradleVersionAtLeast(6,0)) {
-            val gradleExecutionOperation = project.objects.newInstance(GradleExecutionOperation::class.java)
+            val gradleExecutionOperation = project.objects.newInstance(GradleExecOperationsHolder::class.java)
             gradleExecutionOperation.execOperation.javaexec {
                 it.classpath = project.files(computedCompilerClasspath)
                 it.args = allArgs.toList()
