@@ -110,5 +110,7 @@ public expect class UninitializedPropertyAccessException : RuntimeException {
 }
 
 
+@SinceKotlin("1.4")
 public expect fun Throwable.addSuppressed(exception: Throwable)
+@SinceKotlin("1.4")
 public expect val Throwable.suppressedExceptions: List<Throwable>

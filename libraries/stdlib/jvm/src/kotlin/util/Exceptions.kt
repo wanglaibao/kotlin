@@ -45,10 +45,12 @@ public val Throwable.stackTrace: Array<StackTraceElement>
  * When supported by the platform adds the specified exception to the list of exceptions that were
  * suppressed in order to deliver this exception.
  */
+@SinceKotlin("1.1")
 public actual fun Throwable.addSuppressed(exception: Throwable) {
     if (this !== exception)
         IMPLEMENTATIONS.addSuppressed(this, exception)
 }
 
+@SinceKotlin("1.4")
 public actual val Throwable.suppressedExceptions: List<Throwable>
     get() = IMPLEMENTATIONS.getSuppressed(this)
