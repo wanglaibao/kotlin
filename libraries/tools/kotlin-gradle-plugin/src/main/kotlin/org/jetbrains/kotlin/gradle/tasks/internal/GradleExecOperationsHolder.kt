@@ -11,5 +11,5 @@ import org.gradle.process.ExecOperations
 /**
  * Available since Gradle 6.0
  */
-open class GradleExecutionOperation @Inject constructor(val execOperation: ExecOperations) {
+open class GradleExecOperationsHolder @Inject constructor(val execOperation: ExecOperations) {
 }
