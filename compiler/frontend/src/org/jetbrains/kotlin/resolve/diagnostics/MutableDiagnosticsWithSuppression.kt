@@ -39,7 +39,7 @@ class MutableDiagnosticsWithSuppression @JvmOverloads constructor(
 
     private fun readonlyView(): DiagnosticsWithSuppression = cache.value!!
 
-    override val modificationTracker by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    override val modificationTracker by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         CompositeModificationTracker(delegateDiagnostics.modificationTracker)
     }
 
