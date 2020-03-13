@@ -111,4 +111,4 @@ public expect class UninitializedPropertyAccessException : RuntimeException {
 
 
 public expect fun Throwable.addSuppressed(exception: Throwable)
-public expect val Throwable.suppressed: Array<Throwable>
+public expect val Throwable.suppressedExceptions: List<Throwable>

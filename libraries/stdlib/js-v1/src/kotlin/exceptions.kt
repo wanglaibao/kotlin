@@ -108,11 +108,11 @@ public actual open class UninitializedPropertyAccessException actual constructor
 }
 
 public actual fun Throwable.addSuppressed(exception: Throwable) {
-    initSuppressed().add(exception)
+    if (this !== exception) initSuppressed().add(exception)
 }
 
-public actual val Throwable.suppressed: Array<Throwable> get() {
-    return this.asDynamic()._suppressed?.unsafeCast<MutableList<Throwable>>()?.toTypedArray() ?: emptyArray()
+public actual val Throwable.suppressedExceptions: List<Throwable> get() {
+    return this.asDynamic()._suppressed?.unsafeCast<List<Throwable>>() ?: emptyList()
 }
 
 private fun Throwable.initSuppressed(): MutableList<Throwable> {

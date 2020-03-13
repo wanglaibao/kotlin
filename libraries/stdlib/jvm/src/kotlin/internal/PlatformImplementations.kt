@@ -17,8 +17,6 @@ internal open class PlatformImplementations {
         public val addSuppressed: Method?
         @JvmField
         public val getSuppressed: Method?
-        @JvmField
-        public val emptyThrowableArray: Array<Throwable> = arrayOf<Throwable>()
 
         init {
             val throwableClass = Throwable::class.java
@@ -33,9 +31,9 @@ internal open class PlatformImplementations {
         ReflectThrowable.addSuppressed?.invoke(cause, exception)
     }
 
-    public open fun getSuppressed(exception: Throwable): Array<Throwable> {
-        return ReflectThrowable.getSuppressed?.invoke(exception)?.let { it as Array<Throwable> }
-            ?: ReflectThrowable.emptyThrowableArray
+    public open fun getSuppressed(exception: Throwable): List<Throwable> {
+        return ReflectThrowable.getSuppressed?.invoke(exception)?.let { (it as Array<Throwable>).asList() }
+            ?: emptyList()
     }
 
     public open fun getMatchResultNamedGroup(matchResult: MatchResult, name: String): MatchGroup? {

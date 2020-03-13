@@ -23,5 +23,5 @@ internal open class JDK7PlatformImplementations : PlatformImplementations() {
 
     override fun addSuppressed(cause: Throwable, exception: Throwable) = cause.addSuppressed(exception)
 
-    override fun getSuppressed(exception: Throwable): Array<Throwable> = exception.getSuppressed()
+    override fun getSuppressed(exception: Throwable): List<Throwable> = exception.suppressed.asList()
 }

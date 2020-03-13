@@ -75,15 +75,15 @@ class ExceptionTest {
         val c1 = Exception("Suppressed 1")
         val c2 = Exception("Suppressed 2")
 
-        assertTrue(e1.suppressed.isEmpty())
+        assertTrue(e1.suppressedExceptions.isEmpty())
 
         e1.addSuppressed(c1)
         e1.addSuppressed(c2)
 
         if (supportsSuppressedExceptions) {
-            assertEquals(listOf(c1, c2), e1.suppressed.asList())
+            assertEquals(listOf(c1, c2), e1.suppressedExceptions)
         } else {
-            assertTrue(e1.suppressed.isEmpty())
+            assertTrue(e1.suppressedExceptions.isEmpty())
         }
     }
 
