@@ -106,18 +106,3 @@ public actual open class UninitializedPropertyAccessException actual constructor
     actual constructor(message: String?) : this(message, null)
     actual constructor(cause: Throwable?) : this(undefined, cause)
 }
-
-@SinceKotlin("1.4")
-public actual fun Throwable.addSuppressed(exception: Throwable) {
-    if (this !== exception) initSuppressed().add(exception)
-}
-
-@SinceKotlin("1.4")
-public actual val Throwable.suppressedExceptions: List<Throwable> get() {
-    return this.asDynamic()._suppressed?.unsafeCast<List<Throwable>>() ?: emptyList()
-}
-
-private fun Throwable.initSuppressed(): MutableList<Throwable> {
-    return this.asDynamic()._suppressed?.unsafeCast<MutableList<Throwable>>()
-        ?: mutableListOf<Throwable>().also { this.asDynamic()._suppressed = it }
-}
