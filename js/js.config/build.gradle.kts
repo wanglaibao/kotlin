@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    compile(project(":compiler:frontend.common"))
+    compile(project(":compiler:config"))
 }
 
 sourceSets {
