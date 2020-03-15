@@ -4,7 +4,9 @@ plugins {
 }
 
 dependencies {
+    compile(project(":core:deserialization"))
     compile(project(":compiler:config"))
+    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
 }
 
 sourceSets {
