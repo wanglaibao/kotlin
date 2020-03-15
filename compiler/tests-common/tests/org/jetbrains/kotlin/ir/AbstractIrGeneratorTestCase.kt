@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.psi2ir.Psi2IrConfiguration
 import org.jetbrains.kotlin.psi2ir.Psi2IrTranslator
 import org.jetbrains.kotlin.psi2ir.generators.GeneratorExtensions
 import org.jetbrains.kotlin.resolve.AnalyzingUtils
+import org.jetbrains.kotlin.resolve.CompilerEnvironment
 import org.jetbrains.kotlin.resolve.lazy.JvmResolveUtil
 import org.jetbrains.kotlin.test.ConfigurationKind
 import org.jetbrains.kotlin.test.InTextDirectivesUtils
@@ -114,7 +115,8 @@ abstract class AbstractIrGeneratorTestCase : CodegenTestCase() {
                 TopDownAnalyzerFacadeForJS.analyzeFiles(
                     ktFilesToAnalyze, environment.project, environment.configuration,
                     moduleDescriptors = emptyList(),
-                    friendModuleDescriptors = emptyList()
+                    friendModuleDescriptors = emptyList(),
+                    targetEnvironment = CompilerEnvironment
                 ),
                 psi2ir, ktFilesToAnalyze, GeneratorExtensions()
             )

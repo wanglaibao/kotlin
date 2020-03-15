@@ -115,7 +115,7 @@ class CommonResolverForModuleFactory(
     companion object {
         fun analyzeFiles(
             files: Collection<KtFile>, moduleName: Name, dependOnBuiltIns: Boolean, languageVersionSettings: LanguageVersionSettings,
-            targetPlatform: TargetPlatform,
+            targetPlatform: TargetPlatform, targetEnvironment: TargetEnvironment,
             capabilities: Map<ModuleDescriptor.Capability<*>, Any?> = emptyMap(),
             dependenciesContainer: CommonDependenciesContainer? = null,
             metadataPartProviderFactory: (ModuleContent<ModuleInfo>) -> MetadataPartProvider
@@ -139,7 +139,7 @@ class CommonResolverForModuleFactory(
 
             val resolverForModuleFactory = CommonResolverForModuleFactory(
                 CommonAnalysisParameters(metadataPartProviderFactory),
-                CompilerEnvironment,
+                targetEnvironment,
                 targetPlatform,
                 shouldCheckExpectActual = false,
                 dependenciesContainer

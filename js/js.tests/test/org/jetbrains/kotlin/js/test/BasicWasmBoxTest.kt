@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.kotlin.resolve.CompilerEnvironment
 import org.jetbrains.kotlin.test.KotlinTestUtils
 import org.jetbrains.kotlin.test.KotlinTestWithEnvironment
 import org.jetbrains.kotlin.test.TestFiles
@@ -154,7 +155,7 @@ abstract class BasicWasmBoxTest(
     private fun createConfig(): JsConfig {
         val configuration = environment.configuration.copy()
         configuration.put(CommonConfigurationKeys.MODULE_NAME, TEST_MODULE)
-        return JsConfig(project, configuration, null, null)
+        return JsConfig(project, configuration, CompilerEnvironment, null, null)
     }
 
     private inner class TestFileFactoryImpl : TestFiles.TestFileFactoryNoModules<TestFile>(), Closeable {

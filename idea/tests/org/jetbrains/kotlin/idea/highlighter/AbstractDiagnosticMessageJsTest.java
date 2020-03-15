@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.analyzer.AnalysisResult;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.idea.project.IdeaEnvironment;
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase;
 import org.jetbrains.kotlin.js.analyze.TopDownAnalyzerFacadeForJS;
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys;
@@ -66,6 +67,6 @@ public abstract class AbstractDiagnosticMessageJsTest extends AbstractDiagnostic
                 LanguageVersionSettingsImpl.DEFAULT.getApiVersion(),
                 Collections.emptyMap(),
                 specificFeatures));
-        return new JsConfig(getProject(), configuration);
+        return new JsConfig(getProject(), configuration, IdeaEnvironment.INSTANCE);
     }
 }

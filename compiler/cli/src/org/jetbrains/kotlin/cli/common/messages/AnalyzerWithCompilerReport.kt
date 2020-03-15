@@ -34,10 +34,7 @@ import org.jetbrains.kotlin.diagnostics.rendering.DefaultErrorMessages
 import org.jetbrains.kotlin.load.java.components.TraceBasedErrorReporter
 import org.jetbrains.kotlin.metadata.jvm.deserialization.JvmBytecodeBinaryVersion
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.resolve.AnalyzingUtils
-import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
-import org.jetbrains.kotlin.resolve.DescriptorUtils
+import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.checkers.ExperimentalUsageChecker
 import org.jetbrains.kotlin.resolve.diagnostics.Diagnostics
 import org.jetbrains.kotlin.resolve.jvm.JvmBindingContextSlices
@@ -48,6 +45,9 @@ class AnalyzerWithCompilerReport(
     private val messageCollector: MessageCollector,
     private val languageVersionSettings: LanguageVersionSettings
 ) : AbstractAnalyzerWithCompilerReport {
+    override val targetEnvironment: TargetEnvironment
+        get() = CompilerEnvironment
+
     override lateinit var analysisResult: AnalysisResult
 
     constructor(configuration: CompilerConfiguration) : this(

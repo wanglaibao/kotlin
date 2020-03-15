@@ -189,7 +189,7 @@ fun createContainerForLazyLocalClassifierAnalyzer(
 
     useInstance(NoTopLevelDescriptorProvider)
 
-    CompilerEnvironment.configure(this)
+    TargetEnvironment.configureCompilerEnvironment(this)
 
     useInstance(FileScopeProvider.ThrowException)
     useImpl<AnnotationResolverImpl>()

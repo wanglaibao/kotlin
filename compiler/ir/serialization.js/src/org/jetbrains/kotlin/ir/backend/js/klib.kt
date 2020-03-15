@@ -366,6 +366,7 @@ private class ModulesStructure(
                 compilerConfiguration,
                 allDependencies.getFullList().map { getModuleDescriptor(it) },
                 friendModuleDescriptors = friendDependencies.map { getModuleDescriptor(it) },
+                targetEnvironment = analyzer.targetEnvironment,
                 thisIsBuiltInsModule = builtInModuleDescriptor == null,
                 customBuiltInsModule = builtInModuleDescriptor
             )
