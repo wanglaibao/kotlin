@@ -5,15 +5,20 @@
 
 package org.jetbrains.kotlin.idea.debugger.coroutine.proxy
 
+import com.intellij.debugger.engine.DebugProcess
 import com.intellij.debugger.engine.evaluation.EvaluateException
+import com.intellij.debugger.jdi.ClassesByNameProvider
+import com.intellij.debugger.jdi.GeneratedLocation
+import com.intellij.util.containers.ContainerUtil
 import com.sun.jdi.*
-import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineInfoData
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.*
 import org.jetbrains.kotlin.idea.debugger.evaluate.DefaultExecutionContext
 
-class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, private val executionContext: DefaultExecutionContext) : CoroutineInfoProvider {
+class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, private val executionContext: DefaultExecutionContext) :
+    CoroutineInfoProvider {
+    private val coroutineContextReference: CoroutineContextReference = CoroutineContextReference(executionContext)
+
     private val debugProbesImplClsRef = executionContext.findClass("$DEBUG_PACKAGE.internal.DebugProbesImpl") as ClassType
-    private val coroutineNameClsRef = executionContext.findClass("kotlinx.coroutines.CoroutineName") as ClassType
-    private val classClsRef = executionContext.findClass("java.lang.Object") as ClassType
     private val debugProbesImplInstance = with(debugProbesImplClsRef) { getValue(fieldByName("INSTANCE")) as ObjectReference }
     private val enhanceStackTraceWithThreadDumpRef: Method = debugProbesImplClsRef
         .methodsByName("enhanceStackTraceWithThreadDump").single()
@@ -23,34 +28,21 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
 
     // CoroutineInfo
     private val coroutineInfoClsRef = executionContext.findClass("$DEBUG_PACKAGE.CoroutineInfo") as ClassType
-    private val coroutineContextClsRef = executionContext.findClass("kotlin.coroutines.CoroutineContext") as InterfaceType
 
     private val getStateRef: Method = coroutineInfoClsRef.concreteMethodByName("getState", "()Lkotlinx/coroutines/debug/State;")
     private val getContextRef: Method = coroutineInfoClsRef.concreteMethodByName("getContext", "()Lkotlin/coroutines/CoroutineContext;")
-    private val sequenceNumberFieldRef: Field = coroutineInfoClsRef.fieldByName("sequenceNumber")
     private val lastObservedStackTraceRef: Method = coroutineInfoClsRef.methodsByName("lastObservedStackTrace").single()
-    private val getContextElement: Method = coroutineContextClsRef.methodsByName("get").single()
-    private val getNameRef: Method = coroutineNameClsRef.methodsByName("getName").single()
-    private val keyFieldRef = coroutineNameClsRef.fieldByName("Key")
-    val toString: Method = classClsRef.concreteMethodByName("toString", "()Ljava/lang/String;")
 
+    private val sequenceNumberFieldRef: Field = coroutineInfoClsRef.fieldByName("sequenceNumber")
     private val lastObservedThreadFieldRef: Field = coroutineInfoClsRef.fieldByName("lastObservedThread")
     private val lastObservedFrameFieldRef: Field = coroutineInfoClsRef.fieldByName("lastObservedFrame") // continuation
 
-    // Methods for list
-    private val listClsRef = executionContext.findClass("java.util.List") as InterfaceType
-    private val sizeRef: Method = listClsRef.methodsByName("size").single()
-    private val getRef: Method = listClsRef.methodsByName("get").single()
-    private val stackTraceElementClsRef = executionContext.findClass("java.lang.StackTraceElement") as ClassType
-
-    // for StackTraceElement
-    private val methodNameFieldRef: Field = stackTraceElementClsRef.fieldByName("methodName")
-    private val declaringClassFieldRef: Field = stackTraceElementClsRef.fieldByName("declaringClass")
-    private val fileNameFieldRef: Field = stackTraceElementClsRef.fieldByName("fileName")
-    private val lineNumberFieldRef: Field = stackTraceElementClsRef.fieldByName("lineNumber")
-
     // value
-    private val keyFieldValueRef = coroutineNameClsRef.getValue(keyFieldRef) as ObjectReference
+    private val vm = executionContext.vm
+    private val classesByName = ClassesByNameProvider.createCache(vm.allClasses())
+
+
+    private val coroutineContext: CoroutineContext = CoroutineContext(executionContext)
 
     @Synchronized
     @Suppress("unused")
@@ -65,19 +57,13 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
     override fun dumpCoroutinesInfo(): List<CoroutineInfoData> {
         val coroutinesInfo = executionContext.invokeMethodAsObject(instance, dumpMethod) ?: return emptyList()
         executionContext.keepReference(coroutinesInfo)
-        val size = sizeOf(coroutinesInfo)
+        val size = coroutineContextReference.sizeOf(coroutinesInfo, executionContext)
 
         return MutableList(size) {
-            val elem = getElementFromList(coroutinesInfo, it)
+            val elem = coroutineContextReference.elementFromList(coroutinesInfo, it, executionContext)
             fetchCoroutineState(elem)
         }
     }
-
-    private fun getElementFromList(instance: ObjectReference, num: Int) =
-        executionContext.invokeMethod(
-            instance, getRef,
-            listOf(executionContext.vm.virtualMachine.mirrorOf(num))
-        ) as ObjectReference
 
     private fun fetchCoroutineState(instance: ObjectReference): CoroutineInfoData {
         val name = getName(instance)
@@ -85,13 +71,62 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
         val thread = getLastObservedThread(instance, lastObservedThreadFieldRef)
         val lastObservedFrameFieldRef = instance.getValue(lastObservedFrameFieldRef) as? ObjectReference
         val stackTrace = getStackTrace(instance)
+        val creationFrameSeparatorIndex = findCreationFrameIndex(stackTrace)
+        val coroutineStackTrace = stackTrace.take(creationFrameSeparatorIndex)
+
+        val coroutineStackTraceFrameItems = coroutineStackTrace.map {
+            SuspendCoroutineStackFrameItem(it, createLocation(it))
+        }
+        val creationStackTrace = stackTrace.subList(creationFrameSeparatorIndex + 1, stackTrace.size)
+        val creationStackTraceFrameItems = creationStackTrace.map {
+            CreationCoroutineStackFrameItem(it, createLocation(it))
+        }
+        val key = CoroutineNameIdState(name,"", State.valueOf(state))
+
         return CoroutineInfoData(
-            name,
-            CoroutineInfoData.State.valueOf(state),
-            stackTrace,
+            key,
+            coroutineStackTraceFrameItems,
+            creationStackTraceFrameItems,
             thread,
             lastObservedFrameFieldRef
         )
+    }
+
+
+    private fun createLocation(stackTraceElement: StackTraceElement): Location = findLocation(
+        ContainerUtil.getFirstItem(classesByName[stackTraceElement.className]),
+        stackTraceElement.methodName,
+        stackTraceElement.lineNumber
+    )
+
+    private fun findLocation(
+        type: ReferenceType?,
+        methodName: String,
+        line: Int
+    ): Location {
+        if (type != null && line >= 0) {
+            try {
+                val location = type.locationsOfLine(DebugProcess.JAVA_STRATUM, null, line).stream()
+                    .filter { l: Location -> l.method().name() == methodName }
+                    .findFirst().orElse(null)
+                if (location != null) {
+                    return location
+                }
+            } catch (ignored: AbsentInformationException) {
+            }
+        }
+        return GeneratedLocation(executionContext.debugProcess, type, methodName, line)
+    }
+
+    /**
+     * Tries to find creation frame separator if any, returns last index if none found
+     */
+    private fun findCreationFrameIndex(frames: List<StackTraceElement>): Int {
+        val index = frames.indexOfFirst { it.isCreationSeparatorFrame() }
+        return if (index < 0)
+            frames.lastIndex
+        else
+            index
     }
 
     private fun getName(
@@ -103,16 +138,8 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
             getContextRef,
             emptyList()
         ) as? ObjectReference ?: throw IllegalArgumentException("Coroutine context must not be null")
-        val coroutineName = executionContext.invokeMethod(
-            coroutineContextInst,
-            getContextElement, listOf(keyFieldValueRef)
-        ) as? ObjectReference
-        // If the coroutine doesn't have a given name, CoroutineContext.get(CoroutineName) returns null
-        val name = if (coroutineName != null) (executionContext.invokeMethod(
-            coroutineName,
-            getNameRef,
-            emptyList()
-        ) as StringReference).value() else "coroutine"
+        val context = coroutineContext.mirror(coroutineContextInst, executionContext)
+        val name = context?.name ?: "coroutine"
         val id = (info.getValue(sequenceNumberFieldRef) as LongValue).value()
         return "$name#$id"
     }
@@ -122,7 +149,7 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
     ): String {
         // equals to `stringState = coroutineInfo.state.toString()`
         val state = executionContext.invokeMethod(info, getStateRef, emptyList()) as ObjectReference
-        return (executionContext.invokeMethod(state, toString, emptyList()) as StringReference).value()
+        return coroutineContextReference.string(state, executionContext)
     }
 
     private fun getLastObservedThread(
@@ -137,20 +164,21 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
         info: ObjectReference
     ): List<StackTraceElement> {
         val frameList = lastObservedStackTrace(info)
-        val tmpList = mutableListOf<StackTraceElement>()
-        for (it in 0 until sizeOf(frameList)) {
-            val frame = getElementFromList(frameList, it)
-            val ste = newStackTraceElement(frame)
-            tmpList.add(ste)
-        }
+//        val tmpList = mutableListOf<StackTraceElement>()
+//        val sizeOfFrameList = coroutineContextReference.sizeOf(frameList, executionContext)
+//        for (it in 0 until sizeOfFrameList) {
+//            val frame = coroutineContextReference.elementFromList(frameList, it, executionContext)
+//            val ste = coroutineContextReference.stackTraceElement(frame)
+//            tmpList.add(ste)
+//        }
         val mergedFrameList = enhanceStackTraceWithThreadDump(listOf(info, frameList))
-        val size = sizeOf(mergedFrameList)
+        val sizeOfMergedFrameList = coroutineContextReference.sizeOf(mergedFrameList, executionContext)
 
         val list = mutableListOf<StackTraceElement>()
 
-        for (it in 0 until size) {
-            val frame = getElementFromList(mergedFrameList, it)
-            val ste = newStackTraceElement(frame)
+        for (it in 0 until sizeOfMergedFrameList) {
+            val frame = coroutineContextReference.elementFromList(mergedFrameList, it, executionContext)
+            val ste = coroutineContextReference.stackTraceElement(frame)
             list.add(// 0, // add in the beginning // @TODO what's the point?
                 ste
             )
@@ -158,25 +186,6 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
         return list
     }
 
-    private fun newStackTraceElement(frame: ObjectReference) =
-        StackTraceElement(
-            fetchClassName(frame),
-            fetchMethodName(frame),
-            fetchFileName(frame),
-            fetchLine(frame)
-        )
-
-    private fun fetchLine(instance: ObjectReference) =
-        (instance.getValue(lineNumberFieldRef) as? IntegerValue)?.value() ?: -1
-
-    private fun fetchFileName(instance: ObjectReference) =
-        (instance.getValue(fileNameFieldRef) as? StringReference)?.value() ?: ""
-
-    private fun fetchMethodName(instance: ObjectReference) =
-        (instance.getValue(methodNameFieldRef) as? StringReference)?.value() ?: ""
-
-    private fun fetchClassName(instance: ObjectReference) =
-        (instance.getValue(declaringClassFieldRef) as? StringReference)?.value() ?: ""
 
     private fun lastObservedStackTrace(instance: ObjectReference) =
         executionContext.invokeMethod(instance, lastObservedStackTraceRef, emptyList()) as ObjectReference
@@ -186,9 +195,6 @@ class CoroutineLibraryAgentProxy(private val debugProbesClsRef: ClassType, priva
             debugProbesImplInstance,
             enhanceStackTraceWithThreadDumpRef, args
         ) as ObjectReference
-
-    private fun sizeOf(args: ObjectReference): Int =
-        (executionContext.invokeMethod(args, sizeRef, emptyList()) as IntegerValue).value()
 
     companion object {
         private const val DEBUG_PACKAGE = "kotlinx.coroutines.debug"

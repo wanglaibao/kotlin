@@ -38,13 +38,15 @@ class CoroutineAsyncStackTraceProvider : AsyncStackTraceProvider {
 
         if (threadAndContextSupportsEvaluation(suspendContext, resumeWithFrame)) {
             val stackFrames = mutableListOf<CoroutineStackFrameItem>()
-            stackFrames.addAll(stackFrame.restoredStackFrame.drop(1).dropLast(1)) // because first frame has been generated via CoroutinePreflightStackFrame
+            stackFrames.addAll(
+                stackFrame.restoredStackFrame.drop(1).dropLast(1)
+            ) // because first frame has been generated via CoroutinePreflightStackFrame
 
             val lastRestoredFrame = stackFrame.restoredStackFrame.last()
 
             stackFrames.addAll(stackFrame.threadPreCoroutineFrames.mapIndexed { index, stackFrameProxyImpl ->
-                if(index == 0)
-                    PreCoroutineStackFrameItem(stackFrameProxyImpl, lastRestoredFrame)
+                if (index == 0)
+                    PreCoroutineStackFrameItem(stackFrameProxyImpl, lastRestoredFrame) // get location and variables also from restored part
                 else
                     PreCoroutineStackFrameItem(stackFrameProxyImpl)
             })
@@ -62,7 +64,8 @@ class CoroutineAsyncStackTraceProvider : AsyncStackTraceProvider {
             return null
 
         if (threadAndContextSupportsEvaluation(suspendContext, frameProxy))
-            return ContinuationHolder.lookupForResumeMethodContinuation(suspendContext, frameProxy)?.getAsyncStackTraceIfAny()
+            return ContinuationHolder.lookupForResumeMethodContinuation(suspendContext, frameProxy)
+                ?.getAsyncStackTraceIfAny()?.stackFrameItems
         return null
     }
 

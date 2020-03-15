@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.idea.debugger.coroutine.view
 
 import com.intellij.debugger.engine.DebugProcessImpl
-import com.intellij.debugger.engine.JavaDebugProcess
 import com.intellij.debugger.engine.JavaExecutionStack
 import com.intellij.debugger.engine.SuspendContextImpl
 import com.intellij.debugger.jdi.ThreadReferenceProxyImpl
@@ -208,9 +207,10 @@ class XCoroutineView(val project: Project, val session: XDebugSession) :
                     if (frame is CreationCoroutineStackFrameItem)
                         creationStack.add(frame)
                     else if (frame is CoroutineStackFrameItem)
-                        children.add(CoroutineFrameValue(frame))
+                        children.add(CoroutineFrameValue(infoData, frame))
                 }
-                children.add(CreationFramesContainer(infoData, creationStack))
+                if (creationStack.isNotEmpty())
+                    children.add(CreationFramesContainer(infoData, creationStack))
                 node.addChildren(children, true)
             }
         }
@@ -225,17 +225,18 @@ class XCoroutineView(val project: Project, val session: XDebugSession) :
             val children = XValueChildrenList()
 
             creationFrames.forEach {
-                children.add(CoroutineFrameValue(it))
+                children.add(CoroutineFrameValue(infoData, it))
             }
             node.addChildren(children, true)
         }
     }
 
     inner class CoroutineFrameValue(
-        val frame: CoroutineStackFrameItem
-    ) : XNamedValue(frame.uniqueId()) {
+        val infoData: CoroutineInfoData,
+        val frameItem: CoroutineStackFrameItem
+    ) : XNamedValue(frameItem.uniqueId()) {
         override fun computePresentation(node: XValueNode, place: XValuePlace) =
-            applyRenderer(node, renderer.render(frame.location))
+            applyRenderer(node, renderer.render(frameItem.location))
     }
 
     private fun applyRenderer(node: XValueNode, presentation: SimpleColoredTextIcon) =
@@ -247,6 +248,3 @@ class XCoroutineView(val project: Project, val session: XDebugSession) :
     }
 
 }
-
-class CoroutineDebuggerExecutionStack(threadReferenceProxy: ThreadReferenceProxyImpl, debugProcess: DebugProcessImpl, isCurrentContext: Boolean) :
-    JavaExecutionStack(threadReferenceProxy, debugProcess, isCurrentContext)

@@ -22,22 +22,22 @@ import org.jetbrains.kotlin.idea.debugger.coroutine.coroutineDebuggerTraceEnable
 import org.jetbrains.kotlin.idea.debugger.coroutine.util.logger
 
 class CreationCoroutineStackFrameItem(
-    val frame: StackFrameProxyImpl,
     val stackTraceElement: StackTraceElement,
     location: Location
 ) : CoroutineStackFrameItem(location, emptyList()) {
-    fun emptyDescriptor() =
+    fun emptyDescriptor(frame: StackFrameProxyImpl) =
         EmptyStackFrameDescriptor(stackTraceElement, frame)
 }
 
+/**
+ * Suspended frames in Suspended coroutine
+ */
 class SuspendCoroutineStackFrameItem(
-    val frame: StackFrameProxyImpl,
     val stackTraceElement: StackTraceElement,
-    val lastObservedFrameFieldRef: ObjectReference,
     location: Location,
     spilledVariables: List<XNamedValue> = emptyList()
 ) : CoroutineStackFrameItem(location, spilledVariables) {
-    fun emptyDescriptor() =
+    fun emptyDescriptor(frame: StackFrameProxyImpl) =
         EmptyStackFrameDescriptor(stackTraceElement, frame)
 }
 
@@ -47,6 +47,9 @@ class RunningCoroutineStackFrameItem(
     spilledVariables: List<XNamedValue> = emptyList()
 ) : CoroutineStackFrameItem(frame.location(), spilledVariables)
 
+/**
+ * Restored frame in Running coroutine, attaching to running thread
+ */
 class RestoredCoroutineStackFrameItem(
     val frame: StackFrameProxyImpl,
     location: Location,
@@ -56,8 +59,14 @@ class RestoredCoroutineStackFrameItem(
         StackFrameDescriptorImpl(frame, MethodsTracker())
 }
 
+/**
+ * Restored from memory dump
+ */
 class DefaultCoroutineStackFrameItem(location: Location, spilledVariables: List<XNamedValue>) :
     CoroutineStackFrameItem(location, spilledVariables) {
+
+    fun emptyDescriptor(frame: StackFrameProxyImpl) =
+        StackFrameDescriptorImpl(frame, MethodsTracker())
 }
 
 /**
@@ -72,10 +81,15 @@ class DefaultCoroutineStackFrameItem(location: Location, spilledVariables: List<
  * - PreCoroutineStackFrameItem part of CoroutinePreflightStackFrame
  *
  */
-class PreCoroutineStackFrameItem(val frame: StackFrameProxyImpl, location: Location, variables: List<XNamedValue> = emptyList()) : CoroutineStackFrameItem(location, variables) {
+class PreCoroutineStackFrameItem(val frame: StackFrameProxyImpl, location: Location, variables: List<XNamedValue> = emptyList()) :
+    CoroutineStackFrameItem(location, variables) {
     constructor(frame: StackFrameProxyImpl, variables: List<XNamedValue> = emptyList()) : this(frame, frame.location(), variables)
 
-    constructor(frame: StackFrameProxyImpl, restoredCoroutineStackFrameItem: CoroutineStackFrameItem) : this(frame, restoredCoroutineStackFrameItem.location, restoredCoroutineStackFrameItem.spilledVariables)
+    constructor(frame: StackFrameProxyImpl, restoredCoroutineStackFrameItem: CoroutineStackFrameItem) : this(
+        frame,
+        restoredCoroutineStackFrameItem.location,
+        restoredCoroutineStackFrameItem.spilledVariables
+    )
 
     override fun createFrame(debugProcess: DebugProcessImpl): CapturedStackFrame {
         return PreCoroutineStackFrame(frame, debugProcess, this)
@@ -85,19 +99,22 @@ class PreCoroutineStackFrameItem(val frame: StackFrameProxyImpl, location: Locat
 /**
  * Can act as a joint frame, take variables form restored frame and information from the original one.
  */
-class PreCoroutineStackFrame(val frame: StackFrameProxyImpl, val debugProcess: DebugProcessImpl, item: StackFrameItem) : CoroutineStackFrame(debugProcess, item) {
+class PreCoroutineStackFrame(val frame: StackFrameProxyImpl, val debugProcess: DebugProcessImpl, item: StackFrameItem) :
+    CoroutineStackFrame(debugProcess, item) {
     override fun computeChildren(node: XCompositeNode) {
         debugProcess.invokeInManagerThread {
-            debugProcess.getPositionManager().createStackFrame(frame, debugProcess, frame.location())?.computeChildren(node) // hack but works
+            debugProcess.getPositionManager().createStackFrame(frame, debugProcess, frame.location())
+                ?.computeChildren(node) // hack but works
         }
         super.computeChildren(node)
     }
 }
 
-open class CoroutineStackFrame(debugProcess: DebugProcessImpl, val item: StackFrameItem) : StackFrameItem.CapturedStackFrame(debugProcess, item) {
+open class CoroutineStackFrame(debugProcess: DebugProcessImpl, val item: StackFrameItem) :
+    StackFrameItem.CapturedStackFrame(debugProcess, item) {
     override fun customizePresentation(component: ColoredTextContainer) {
         if (coroutineDebuggerTraceEnabled())
-            component.append( "${item.javaClass.simpleName} / ${this.javaClass.simpleName}" , SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            component.append("${item.javaClass.simpleName} / ${this.javaClass.simpleName}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         super.customizePresentation(component)
     }
 

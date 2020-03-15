@@ -26,7 +26,6 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
     private val coroutineStackFrameProvider = CoroutineAsyncStackTraceProvider()
     val debugProcess = suspendContext.debugProcess
     private val virtualMachineProxy = debugProcess.virtualMachineProxy
-    private val classesByName = ClassesByNameProvider.createCache(virtualMachineProxy.allClasses())
 
     companion object {
         const val CREATION_STACK_TRACE_SEPARATOR = "\b\b\b" // the "\b\b\b" is used as creation stacktrace separator in kotlinx.coroutines
@@ -34,10 +33,8 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
 
     fun build(coroutine: CoroutineInfoData): List<CoroutineStackFrameItem> {
         val coroutineStackFrameList = mutableListOf<CoroutineStackFrameItem>()
-        val topRunningFrame = suspendContext.thread?.forceFrames()?.first() ?: return coroutineStackFrameList
-        val creationFrameSeparatorIndex = findCreationFrameIndex(coroutine.stackTrace)
 
-        if (coroutine.state == CoroutineInfoData.State.RUNNING && coroutine.activeThread is ThreadReference) {
+        if (coroutine.isRunning() && coroutine.activeThread is ThreadReference) {
             val threadReferenceProxyImpl = ThreadReferenceProxyImpl(debugProcess.virtualMachineProxy, coroutine.activeThread)
             val executionStack = JavaExecutionStack(threadReferenceProxyImpl, debugProcess, suspendedSameThread(coroutine.activeThread))
 
@@ -78,35 +75,10 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
                     )
                 coroutineStackInserted = false
             }
-        } else if ((coroutine.state == CoroutineInfoData.State
-                .SUSPENDED || coroutine.activeThread == null) && coroutine.lastObservedFrameFieldRef is ObjectReference
-        ) {
-            // to get frames from CoroutineInfo anyway
-            // the thread is paused on breakpoint - it has at least one frame
-            val suspendedStackTrace = coroutine.stackTrace.take(creationFrameSeparatorIndex)
-            for (suspendedFrame in suspendedStackTrace) {
-                val location = createLocation(suspendedFrame)
-                coroutineStackFrameList.add(
-                    SuspendCoroutineStackFrameItem(
-                        topRunningFrame,
-                        suspendedFrame,
-                        coroutine.lastObservedFrameFieldRef,
-                        location
-                    )
-                )
-            }
-        }
+        } else if ((coroutine.isSuspended() || coroutine.activeThread == null) && coroutine.lastObservedFrameFieldRef is ObjectReference)
+            coroutineStackFrameList.addAll(coroutine.stackTrace)
 
-        coroutine.stackTrace.subList(creationFrameSeparatorIndex + 1, coroutine.stackTrace.size).forEach {
-            val location = createLocation(it)
-            coroutineStackFrameList.add(
-                CreationCoroutineStackFrameItem(
-                    topRunningFrame,
-                    it,
-                    location
-                )
-            )
-        }
+        coroutineStackFrameList.addAll(coroutine.creationStackTrace)
         coroutine.stackFrameList.addAll(coroutineStackFrameList)
         return coroutineStackFrameList
     }
@@ -114,44 +86,8 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
     private fun suspendedSameThread(activeThread: ThreadReference) =
         activeThread == suspendContext.thread?.threadReference
 
-    private fun createLocation(stackTraceElement: StackTraceElement): Location = findLocation(
-        ContainerUtil.getFirstItem(classesByName[stackTraceElement.className]),
-        stackTraceElement.methodName,
-        stackTraceElement.lineNumber
-    )
 
-    private fun findLocation(
-        type: ReferenceType?,
-        methodName: String,
-        line: Int
-    ): Location {
-        if (type != null && line >= 0) {
-            try {
-                val location = type.locationsOfLine(DebugProcess.JAVA_STRATUM, null, line).stream()
-                    .filter { l: Location -> l.method().name() == methodName }
-                    .findFirst().orElse(null)
-                if (location != null) {
-                    return location
-                }
-            } catch (ignored: AbsentInformationException) {
-            }
-        }
-        return GeneratedLocation(debugProcess, type, methodName, line)
-    }
 
-    /**
-     * Tries to find creation frame separator if any, returns last index if none found
-     */
-    private fun findCreationFrameIndex(frames: List<StackTraceElement>): Int {
-        val index = frames.indexOfFirst { isCreationSeparatorFrame(it) }
-        return if (index < 0)
-            frames.lastIndex
-        else
-            index
-    }
-
-    private fun isCreationSeparatorFrame(it: StackTraceElement) =
-        it.className.startsWith(CREATION_STACK_TRACE_SEPARATOR)
 
     private fun isInvokeSuspendNegativeLineMethodFrame(frame: StackFrameProxyImpl) =
         frame.safeLocation()?.safeMethod()?.name() == "invokeSuspend" &&

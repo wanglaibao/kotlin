@@ -6,14 +6,18 @@
 package org.jetbrains.kotlin.idea.debugger.coroutine.proxy
 
 import com.intellij.debugger.engine.SuspendContextImpl
-import com.intellij.debugger.engine.evaluation.EvaluateException
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.debugger.jdi.ThreadReferenceProxyImpl
+import com.intellij.openapi.project.Project
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.xdebugger.XDebugSession
+import com.intellij.xdebugger.XDebuggerUtil
+import com.intellij.xdebugger.XSourcePosition
 import com.sun.jdi.*
 import org.jetbrains.kotlin.idea.debugger.*
-import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.ContinuationHolder.Companion.BASE_CONTINUATION_IMPL_CLASS_NAME
+import org.jetbrains.kotlin.idea.debugger.coroutine.command.CoroutineBuilder
 import org.jetbrains.kotlin.idea.debugger.evaluate.DefaultExecutionContext
 
 fun Method.isInvokeSuspend(): Boolean =
@@ -39,6 +43,12 @@ fun ReferenceType.isContinuation() =
 fun Type.isBaseContinuationImpl() =
     isSubtype("kotlin.coroutines.jvm.internal.BaseContinuationImpl")
 
+fun Type.isAbstractCoroutine() =
+    isSubtype("kotlinx.coroutines.AbstractCoroutine")
+
+fun Type.isSubTypeOrSame(className: String) =
+    name() == className || isSubtype(className)
+
 fun ReferenceType.isSuspendLambda() =
     SUSPEND_LAMBDA_CLASSES.any { isSubtype(it) }
 
@@ -50,18 +60,47 @@ fun StackFrameProxyImpl.variableValue(variableName: String): ObjectReference? {
     return getValue(continuationVariable) as? ObjectReference ?: return null
 }
 
-fun Method.isGetCOROUTINE_SUSPENDED() =
+fun StackFrameProxyImpl.completionVariableValue(): ObjectReference? =
+    variableValue("completion")
+
+private fun Method.isGetCOROUTINE_SUSPENDED() =
     signature() == "()Ljava/lang/Object;" && name() == "getCOROUTINE_SUSPENDED" && declaringType().name() == "kotlin.coroutines.intrinsics.IntrinsicsKt__IntrinsicsKt"
 
 fun DefaultExecutionContext.findCoroutineMetadataType() =
-    findClassSafe("kotlin.coroutines.jvm.internal.DebugMetadataKt")
+    debugProcess.invokeInManagerThread { findClassSafe("kotlin.coroutines.jvm.internal.DebugMetadataKt") }
 
-fun DefaultExecutionContext.findDispatchedContinuationReferenceType() =
+fun DefaultExecutionContext.findCoroutineAnnotationMetadataType() =
+    debugProcess.invokeInManagerThread { findClassSafe("kotlin.coroutines.jvm.internal.DebugMetadata") as InterfaceType? }
+
+fun DefaultExecutionContext.findDispatchedContinuationReferenceType(): List<ReferenceType>? =
     vm.classesByName("kotlinx.coroutines.DispatchedContinuation")
 
 fun findGetCoroutineSuspended(frames: List<StackFrameProxyImpl>) =
     frames.indexOfFirst { it.safeLocation()?.safeMethod()?.isGetCOROUTINE_SUSPENDED() == true }
 
+fun StackTraceElement.isCreationSeparatorFrame() =
+    className.startsWith(CoroutineBuilder.CREATION_STACK_TRACE_SEPARATOR)
+
+fun StackTraceElement.findPosition(project: Project): XSourcePosition? =
+    getPosition(project, className, lineNumber)
+
+fun Location.findPosition(project: Project) =
+    getPosition(project, declaringType().name(), lineNumber())
+
+fun ClassType.completionField() =
+    fieldByName("completion") as Field?
+
+private fun getPosition(project: Project, className: String, lineNumber: Int): XSourcePosition? {
+    val psiFacade = JavaPsiFacade.getInstance(project)
+    val psiClass = psiFacade.findClass(
+        className.substringBefore("$"), // find outer class, for which psi exists TODO
+        GlobalSearchScope.everythingScope(project)
+    )
+    val classFile = psiClass?.containingFile?.virtualFile
+    // to convert to 0-based line number or '-1' to do not move
+    val localLineNumber = if (lineNumber > 0) lineNumber - 1 else return null
+    return XDebuggerUtil.getInstance().createPosition(classFile, localLineNumber)
+}
 /**
  * Finds previous Continuation for this Continuation (completion field in BaseContinuationImpl)
  * @return null if given ObjectReference is not a BaseContinuationImpl instance or completion is null
@@ -88,4 +127,3 @@ fun SuspendContextImpl.supportsEvaluation() =
 
 fun XDebugSession.suspendContextImpl() =
     suspendContext as SuspendContextImpl
-

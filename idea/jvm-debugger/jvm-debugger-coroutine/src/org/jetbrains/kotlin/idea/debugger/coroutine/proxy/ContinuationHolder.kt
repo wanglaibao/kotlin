@@ -27,19 +27,19 @@ import org.jetbrains.kotlin.idea.debugger.isSubtype
 data class ContinuationHolder(val continuation: ObjectReference, val context: DefaultExecutionContext) {
     val log by logger
 
-    fun getAsyncStackTraceIfAny(): List<CoroutineStackFrameItem> {
-        val frames = mutableListOf<CoroutineStackFrameItem>()
+    fun getAsyncStackTraceIfAny(): CoroutineWithRestoredStack? {
         try {
-            collectFrames(frames)
+            return collectFrames()
         } catch (e: Exception) {
             log.error("Error while looking for variables.", e)
         }
-        return frames
+        return null
     }
 
-    private fun collectFrames(consumer: MutableList<CoroutineStackFrameItem>) {
+    private fun collectFrames(): CoroutineWithRestoredStack? {
+        val consumer = mutableListOf<CoroutineStackFrameItem>()
         var completion = this
-        val debugMetadataKtType = debugMetadataKtType() ?: return
+        val debugMetadataKtType = debugMetadataKtType() ?: return null
         while (completion.isBaseContinuationImpl()) {
             val coroutineStackFrame = context.debugProcess.invokeInManagerThread {
                 createLocation(completion, debugMetadataKtType)
@@ -48,6 +48,12 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
                 consumer.add(coroutineStackFrame)
             }
             completion = completion.findCompletion() ?: break
+        }
+        if (completion.value().type().isAbstractCoroutine())
+            return CoroutineWithRestoredStack(CoroutineHolder.lookup(completion.value(), context), consumer)
+        else {
+            log.warn("AbstractCoroutine not found, ${completion.value().type()} is not subtype of AbstractCoroutine as expected.")
+            return CoroutineWithRestoredStack(null, consumer)
         }
     }
 
@@ -103,13 +109,10 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
 
 
     private fun debugMetadataKtType(): ClassType? {
-        val debugMetadataKtType = context.debugProcess.invokeInManagerThread { context.findCoroutineMetadataType() }
-        if (debugMetadataKtType != null) {
-            return debugMetadataKtType
-        } else {
+        val debugMetadataKtType = context.findCoroutineMetadataType()
+        if (debugMetadataKtType == null)
             log.warn("Continuation information found but no 'kotlin.coroutines.jvm.internal.DebugMetadataKt' class exists. Please check kotlin-stdlib version.")
-        }
-        return null
+        return debugMetadataKtType
     }
 
     fun referenceType(): ClassType? =
@@ -123,40 +126,19 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
 
     fun findCompletion(): ContinuationHolder? {
         val type = continuation.type()
-        if (type is ClassType && isBaseContinuationImpl(type)) {
-            val completionField = type.fieldByName(COMPLETION_FIELD_NAME) ?: return null
+        if (type is ClassType && type.isBaseContinuationImpl()) {
+            val completionField = type.completionField() ?: return null
             return ContinuationHolder(continuation.getValue(completionField) as? ObjectReference ?: return null, context)
         }
         return null
     }
 
     fun isBaseContinuationImpl() =
-        isBaseContinuationImpl(continuation.type())
+        continuation.type().isBaseContinuationImpl()
 
-    private fun isBaseContinuationImpl(type: Type): Boolean {
-        return type is ClassType && type.isSubtype(BASE_CONTINUATION_IMPL_CLASS_NAME)
-    }
 
     companion object {
         val log by logger
-
-        const val BASE_CONTINUATION_IMPL_CLASS_NAME = "kotlin.coroutines.jvm.internal.BaseContinuationImpl"
-        const val COMPLETION_FIELD_NAME = "completion"
-
-        fun lookup(context: ExecutionContext, method: Method, threadProxy: ThreadReferenceProxyImpl): ContinuationHolder? {
-//            if (isInvokeSuspendMethod(method)) {
-//                val tmp = context.frameProxy.thisObject() ?: return null
-//                if (!isSuspendLambda(tmp.referenceType()))
-//                    return null
-//                return ContinuationHolder(tmp, context, threadProxy)
-//            } else if (isSuspendMethod(method)) {
-//                var continuation = getVariableValue(context.frameProxy, CONTINUATION_VARIABLE_NAME) ?: return null
-//                context.keepReference(continuation)
-//                return ContinuationHolder(continuation, context, threadProxy)
-//            } else {
-            return null
-//            }
-        }
 
         fun lookupForResumeMethodContinuation(
             suspendContext: SuspendContextImpl,
@@ -164,7 +146,7 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
         ): ContinuationHolder? {
             if (frame.location().isPreExitFrame()) {
                 val context = suspendContext.executionContext() ?: return null
-                var continuation = frame.variableValue(COMPLETION_FIELD_NAME) ?: return null
+                var continuation = frame.completionVariableValue() ?: return null
                 context.keepReference(continuation)
                 return ContinuationHolder(continuation, context)
             } else
@@ -197,11 +179,11 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
                 val resumeWithFrame = frames[indexOfCurrentFrame + 1] ?: return null
                 val ch = lookupForResumeMethodContinuation(suspendContext, resumeWithFrame) ?: return null
 
-                val coroutineStackTrace = ch.getAsyncStackTraceIfAny()
+                val coroutineStackTrace = ch.getAsyncStackTraceIfAny() ?: return null
                 return CoroutinePreflightStackFrame.preflight(
                     invokeSuspendFrame,
                     resumeWithFrame,
-                    coroutineStackTrace,
+                    coroutineStackTrace.stackFrameItems,
                     frames.drop(indexOfCurrentFrame)
                 )
             }
@@ -211,7 +193,6 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
         private fun formatLocation(location: Location): String {
             return "${location.method().name()}:${location.lineNumber()}, ${location.method().declaringType()} in ${location.sourceName()}"
         }
-
 
         /**
          * Find continuation for the [frame]
@@ -241,22 +222,22 @@ data class ContinuationHolder(val continuation: ObjectReference, val context: De
         }
 
         data class ClassNameLineNumber(val className: String?, val lineNumber: Int?)
+//
+//        private fun getClassAndLineNumber(context: ExecutionContext, continuation: ObjectReference): ClassNameLineNumber {
+//            val objectReference = findStackTraceElement(context, continuation) ?: return ClassNameLineNumber(null, null)
+//            val classStackTraceElement = context.findClass("java.lang.StackTraceElement") as ClassType
+//            val getClassName = classStackTraceElement.concreteMethodByName("getClassName", "()Ljava/lang/String;")
+//            val getLineNumber = classStackTraceElement.concreteMethodByName("getLineNumber", "()I")
+//            val className = (context.invokeMethod(objectReference, getClassName, emptyList()) as StringReference).value()
+//            val lineNumber = (context.invokeMethod(objectReference, getLineNumber, emptyList()) as IntegerValue).value()
+//            return ClassNameLineNumber(className, lineNumber)
+//        }
 
-        private fun getClassAndLineNumber(context: ExecutionContext, continuation: ObjectReference): ClassNameLineNumber {
-            val objectReference = findStackTraceElement(context, continuation) ?: return ClassNameLineNumber(null, null)
-            val classStackTraceElement = context.findClass("java.lang.StackTraceElement") as ClassType
-            val getClassName = classStackTraceElement.concreteMethodByName("getClassName", "()Ljava/lang/String;")
-            val getLineNumber = classStackTraceElement.concreteMethodByName("getLineNumber", "()I")
-            val className = (context.invokeMethod(objectReference, getClassName, emptyList()) as StringReference).value()
-            val lineNumber = (context.invokeMethod(objectReference, getLineNumber, emptyList()) as IntegerValue).value()
-            return ClassNameLineNumber(className, lineNumber)
-        }
-
-        private fun findStackTraceElement(context: ExecutionContext, continuation: ObjectReference): ObjectReference? {
-            val classType = continuation.type() as ClassType
-            val methodGetStackTraceElement = classType.concreteMethodByName("getStackTraceElement", "()Ljava/lang/StackTraceElement;")
-            return context.invokeMethod(continuation, methodGetStackTraceElement, emptyList()) as? ObjectReference
-        }
+//        private fun findStackTraceElement(context: ExecutionContext, continuation: ObjectReference): ObjectReference? {
+//            val classType = continuation.type() as ClassType
+//            val methodGetStackTraceElement = classType.concreteMethodByName("getStackTraceElement", "()Ljava/lang/StackTraceElement;")
+//            return context.invokeMethod(continuation, methodGetStackTraceElement, emptyList()) as? ObjectReference
+//        }
     }
 }
 

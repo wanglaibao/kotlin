@@ -7,15 +7,16 @@ package org.jetbrains.kotlin.idea.debugger.coroutine.data
 
 import com.sun.jdi.ObjectReference
 import com.sun.jdi.ThreadReference
+import org.jetbrains.kotlin.idea.debugger.coroutine.proxy.CoroutineWithRestoredStack
 
 /**
  * Represents state of a coroutine.
  * @see `kotlinx.coroutines.debug.CoroutineInfo`
  */
 data class CoroutineInfoData(
-    val name: String,
-    val state: State,
-    val stackTrace: List<StackTraceElement>,
+    val key: CoroutineNameIdState,
+    val stackTrace: List<CoroutineStackFrameItem>,
+    val creationStackTrace: List<CreationCoroutineStackFrameItem>,
     val activeThread: ThreadReference? = null, // for suspended coroutines should be null
     val lastObservedFrameFieldRef: ObjectReference?
 ) {
@@ -24,22 +25,40 @@ data class CoroutineInfoData(
     // @TODO for refactoring/removal along with DumpPanel
     val stringStackTrace: String by lazy {
         buildString {
-            appendln("\"$name\", state: $state")
+            appendln("\"${key.name}\", state: ${key.state}")
             stackTrace.forEach {
                 appendln("\t$it")
             }
         }
     }
 
-    fun isSuspended() = state == State.SUSPENDED
+    fun isSuspended() = key.state == State.SUSPENDED
 
-    fun isCreated() = state == State.CREATED
+    fun isCreated() = key.state == State.CREATED
 
-    fun isEmptyStackTrace() = stackTrace.isEmpty()
+    fun isEmptyStack() = stackTrace.isEmpty()
 
-    enum class State {
-        RUNNING,
-        SUSPENDED,
-        CREATED
+    fun isRunning() = key.state == State.RUNNING
+
+    companion object {
+        fun suspendedCoroutineInfoData(coroutineWithRestoredStack: CoroutineWithRestoredStack, lastObservedFrameFieldRef: ObjectReference): CoroutineInfoData? {
+            val info = coroutineWithRestoredStack.coroutine?.info ?: return null
+            return CoroutineInfoData(info, coroutineWithRestoredStack.stackFrameItems, emptyList(), null, lastObservedFrameFieldRef)
+        }
+
     }
+}
+
+data class CoroutineNameIdState(val name: String, val id: String, val state: State)
+
+enum class State {
+    RUNNING,
+    SUSPENDED,
+    CREATED,
+    UNKNOWN,
+    SUSPENDED_COMPLETING,
+    SUSPENDED_CANCELLING,
+    CANCELLED,
+    COMPLETED,
+    NEW
 }

@@ -21,6 +21,7 @@ import com.sun.jdi.Location
 import com.sun.jdi.ReferenceType
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.debugger.coroutine.data.CoroutineInfoData
+import org.jetbrains.kotlin.idea.debugger.coroutine.data.State
 import org.jetbrains.kotlin.idea.debugger.coroutine.util.logger
 import javax.swing.Icon
 
@@ -94,26 +95,30 @@ interface CoroutineDebuggerColors {
     }
 }
 
+fun fromState(state: State): Icon =
+    when (state) {
+        State.SUSPENDED -> AllIcons.Debugger.ThreadSuspended
+        State.RUNNING -> AllIcons.Debugger.ThreadRunning
+        State.CREATED -> AllIcons.Debugger.ThreadStates.Idle
+        else -> AllIcons.Debugger.ThreadStates.Daemon_sign
+    }
+
 class SimpleColoredTextIconPresentationRenderer {
     val log by logger
     private val settings: ThreadsViewSettings = ThreadsViewSettings.getInstance()
 
     fun render(infoData: CoroutineInfoData): SimpleColoredTextIcon {
         val thread = infoData.activeThread
-        val name = thread?.name()?.substringBefore(" @${infoData.name}") ?: ""
+        val name = thread?.name()?.substringBefore(" @${infoData.key.name}") ?: ""
         val threadState = if (thread != null) DebuggerUtilsEx.getThreadStatusText(thread.status()) else ""
 
-        val icon = when (infoData.state) {
-            CoroutineInfoData.State.SUSPENDED -> AllIcons.Debugger.ThreadSuspended
-            CoroutineInfoData.State.RUNNING -> AllIcons.Debugger.ThreadRunning
-            CoroutineInfoData.State.CREATED -> AllIcons.Debugger.ThreadStates.Idle
-        }
+        val icon = fromState(infoData.key.state)
 
         val label = SimpleColoredTextIcon(icon, true)
         label.append("\"")
-        label.appendValue(infoData.name)
-        label.append("\": ${infoData.state}")
-        if(name.isNotEmpty()) {
+        label.appendValue(infoData.key.name)
+        label.append("\": ${infoData.key.state}")
+        if (name.isNotEmpty()) {
             label.append(" on thread \"")
             label.appendValue(name)
             label.append("\": $threadState")
@@ -155,7 +160,7 @@ class SimpleColoredTextIconPresentationRenderer {
                 } else {
                     label.append(name.substring(dotIndex + 1))
                     if (settings.SHOW_PACKAGE_NAME) {
-                        label.append(" (${name.substring( 0, dotIndex)})")
+                        label.append(" (${name.substring(0, dotIndex)})")
                     }
                 }
             }
@@ -172,14 +177,14 @@ class SimpleColoredTextIconPresentationRenderer {
     }
 
     fun renderCreationNode(infoData: CoroutineInfoData) =
-        SimpleColoredTextIcon(AllIcons.Debugger.ThreadSuspended, true, "Creation stack frame of ${infoData.name}")
+        SimpleColoredTextIcon(AllIcons.Debugger.ThreadSuspended, true, "Creation stack frame of ${infoData.key.name}")
 
     fun renderErrorNode(error: String) =
-        SimpleColoredTextIcon(AllIcons.Actions.Lightning,false, KotlinBundle.message(error))
+        SimpleColoredTextIcon(AllIcons.Actions.Lightning, false, KotlinBundle.message(error))
 
     fun renderInfoNode(text: String) =
         SimpleColoredTextIcon(AllIcons.General.Information, false, KotlinBundle.message(text))
 
     fun renderGroup(groupName: String) =
-        SimpleColoredTextIcon(AllIcons.Debugger.ThreadGroup,true, groupName)
+        SimpleColoredTextIcon(AllIcons.Debugger.ThreadGroup, true, groupName)
 }

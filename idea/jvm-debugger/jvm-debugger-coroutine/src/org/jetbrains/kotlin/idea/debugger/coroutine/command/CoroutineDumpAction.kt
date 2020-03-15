@@ -42,14 +42,14 @@ class CoroutineDumpAction : AnAction(), AnAction.TransparentUpdate {
                     val states = CoroutineDebugProbesProxy(context.suspendContext ?: return)
                         .dumpCoroutines()
                     if (states.isOk()) {
-                        val message = KotlinBundle.message("debugger.session.tab.coroutine.message.error")
-                        XDebuggerManagerImpl.NOTIFICATION_GROUP.createNotification(message,MessageType.ERROR).notify(project)
-                    } else {
                         val f = fun() {
                             val ui = session.xDebugSession?.ui ?: return
                             addCoroutineDump(project, states.cache, ui, session.searchScope)
                         }
                         ApplicationManager.getApplication().invokeLater(f, ModalityState.NON_MODAL)
+                    } else {
+                        val message = KotlinBundle.message("debugger.session.tab.coroutine.message.error")
+                        XDebuggerManagerImpl.NOTIFICATION_GROUP.createNotification(message,MessageType.ERROR).notify(project)
                     }
                 }
             })
