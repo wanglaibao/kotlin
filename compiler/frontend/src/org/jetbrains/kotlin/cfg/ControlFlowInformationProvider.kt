@@ -33,7 +33,6 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.forEachDescendantOfType
-import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.BindingContext.*
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -429,31 +428,31 @@ class ControlFlowInformationProvider private constructor(
         val containingDeclarationDescriptor = variableDescriptor.containingDeclaration
         // Do not consider top-level properties
         if (containingDeclarationDescriptor is PackageFragmentDescriptor) return false
-        var parentDeclaration = getElementParentDeclaration(writeValueInstruction.element)
+        var parentDeclaration = writeValueInstruction.element.getElementParentDeclaration()
 
         loop@ while (true) {
             val context = trace.bindingContext
-            val parentDescriptor = getDeclarationDescriptorIncludingConstructors(context, parentDeclaration)
+            val parentDescriptor = parentDeclaration.getDeclarationDescriptorIncludingConstructors(context)
             if (parentDescriptor == containingDeclarationDescriptor) {
                 return false
             }
             when (parentDeclaration) {
                 is KtObjectDeclaration, is KtClassInitializer -> {
                     // anonymous objects / initializers count here the same as its owner
-                    parentDeclaration = getElementParentDeclaration(parentDeclaration)
+                    parentDeclaration = parentDeclaration.getElementParentDeclaration()
                 }
                 is KtDeclarationWithBody -> {
                     // If it is captured write in lambda that is called in-place, then skip it (treat as parent)
                     val maybeEnclosingLambdaExpr = parentDeclaration.parent
                     if (maybeEnclosingLambdaExpr is KtLambdaExpression && trace[LAMBDA_INVOCATIONS, maybeEnclosingLambdaExpr] != null) {
-                        parentDeclaration = getElementParentDeclaration(parentDeclaration)
+                        parentDeclaration = parentDeclaration.getElementParentDeclaration()
                         continue@loop
                     }
 
                     if (parentDeclaration is KtFunction && parentDeclaration.isLocal) return true
                     // miss non-local function or accessor just once
-                    parentDeclaration = getElementParentDeclaration(parentDeclaration)
-                    return getDeclarationDescriptorIncludingConstructors(context, parentDeclaration) != containingDeclarationDescriptor
+                    parentDeclaration = parentDeclaration.getElementParentDeclaration()
+                    return parentDeclaration.getDeclarationDescriptorIncludingConstructors(context) != containingDeclarationDescriptor
                 }
                 else -> {
                     return true
@@ -1118,26 +1117,6 @@ class ControlFlowInformationProvider private constructor(
     ) : VariableContext(instruction, map)
 
     companion object {
-
-        // Should return KtDeclarationWithBody, KtClassOrObject, or KtClassInitializer
-        fun getElementParentDeclaration(element: KtElement) =
-            getParentOfType(element, KtDeclarationWithBody::class.java, KtClassOrObject::class.java, KtClassInitializer::class.java)
-
-        fun getDeclarationDescriptorIncludingConstructors(context: BindingContext, declaration: KtDeclaration?): DeclarationDescriptor? {
-            val descriptor = context.get(
-                DECLARATION_TO_DESCRIPTOR,
-                (declaration as? KtClassInitializer)?.containingDeclaration ?: declaration
-            )
-            return if (descriptor is ClassDescriptor && declaration is KtClassInitializer) {
-                // For a class primary constructor, we cannot directly get ConstructorDescriptor by KtClassInitializer,
-                // so we have to do additional conversion: KtClassInitializer -> KtClassOrObject -> ClassDescriptor -> ConstructorDescriptor
-                descriptor.unsubstitutedPrimaryConstructor
-                    ?: (descriptor as? ClassDescriptorWithResolutionScopes)?.scopeForInitializerResolution?.ownerDescriptor
-            } else {
-                descriptor
-            }
-        }
-
         private fun isUsedAsResultOfLambda(usages: List<Instruction>): Boolean {
             for (usage in usages) {
                 if (usage is ReturnValueInstruction) {
