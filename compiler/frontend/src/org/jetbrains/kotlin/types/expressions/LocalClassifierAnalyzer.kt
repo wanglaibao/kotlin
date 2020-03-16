@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.types.expressions
 
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.cfg.ControlFlowInformationProvider
 import org.jetbrains.kotlin.config.LanguageVersionSettings
 import org.jetbrains.kotlin.container.get
 import org.jetbrains.kotlin.context.GlobalContext
@@ -69,7 +70,8 @@ class LocalClassifierAnalyzer(
     private val delegationFilter: DelegationFilter,
     private val wrappedTypeFactory: WrappedTypeFactory,
     private val kotlinTypeChecker: NewKotlinTypeChecker,
-    private val samConversionResolver: SamConversionResolver
+    private val samConversionResolver: SamConversionResolver,
+    private val controlFlowInformationProviderFactory: ControlFlowInformationProvider.Factory
 ) {
     fun processClassOrObject(
         scope: LexicalWritableScope?,
@@ -106,7 +108,8 @@ class LocalClassifierAnalyzer(
                 kotlinTypeChecker,
                 samConversionResolver
             ),
-            analyzerServices
+            analyzerServices,
+            controlFlowInformationProviderFactory
         )
 
         container.get<LazyTopDownAnalyzer>().analyzeDeclarations(
