@@ -11,7 +11,7 @@ import com.intellij.psi.PsiReference
 import com.intellij.refactoring.move.moveMembers.MoveJavaMemberHandler
 import com.intellij.refactoring.move.moveMembers.MoveMembersOptions
 import com.intellij.refactoring.move.moveMembers.MoveMembersProcessor
-import org.jetbrains.kotlin.idea.references.KtSimpleNameReference
+import org.jetbrains.kotlin.idea.references.getImportAlias
 
 class MoveKotlinMemberHandler : MoveJavaMemberHandler() {
     override fun getUsage(
@@ -20,7 +20,7 @@ class MoveKotlinMemberHandler : MoveJavaMemberHandler() {
         membersToMove: MutableSet<PsiMember>,
         targetClass: PsiClass
     ): MoveMembersProcessor.MoveMembersUsageInfo? {
-        (psiReference as? KtSimpleNameReference)?.getImportAlias()?.let {
+        psiReference?.getImportAlias()?.let {
             return null
         }
         return super.getUsage(member, psiReference, membersToMove, targetClass)
@@ -28,9 +28,7 @@ class MoveKotlinMemberHandler : MoveJavaMemberHandler() {
 
     override fun changeExternalUsage(options: MoveMembersOptions, usage: MoveMembersProcessor.MoveMembersUsageInfo): Boolean {
         val reference = usage.getReference()
-        (reference as? KtSimpleNameReference)?.getImportAlias()?.let {
-            return true
-        }
+        reference?.getImportAlias()?.let { return true }
 
         return super.changeExternalUsage(options, usage)
     }
