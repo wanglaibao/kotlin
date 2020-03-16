@@ -15,6 +15,8 @@ plugins {
 val fatJarContents by configurations.creating
 val fatJarContentsStripMetadata by configurations.creating
 val fatJarContentsStripServices by configurations.creating
+val fatJarContentsStripVersions by configurations.creating
+
 val compilerVersion by configurations.creating
 
 // JPS build assumes fat jar is built from embedded configuration,
@@ -25,6 +27,7 @@ if (kotlinBuildProperties.isInJpsBuildIdeaSync) {
         extendsFrom(fatJarContents)
         extendsFrom(fatJarContentsStripMetadata)
         extendsFrom(fatJarContentsStripServices)
+        extendsFrom(fatJarContentsStripVersions)
         extendsFrom(compilerVersion)
     }
 }
@@ -217,13 +220,15 @@ dependencies {
 
     fatJarContents(intellijDep()) {
         includeIntellijCoreJarDependencies(project) {
-            !(it.startsWith("jdom") || it.startsWith("log4j") || it.startsWith("trove4j"))
+            !(it.startsWith("jdom") || it.startsWith("log4j") || it.startsWith("trove4j") || it.startsWith("streamex"))
         }
     }
 
     fatJarContentsStripServices(jpsStandalone()) { includeJars("jps-model") }
 
     fatJarContentsStripMetadata(intellijDep()) { includeJars("oro-2.0.8", "jdom", "log4j" ) }
+
+    fatJarContentsStripVersions(intellijCoreDep()) { includeJars("streamex", rootProject = rootProject) }
 }
 
 publish()
@@ -249,6 +254,13 @@ val packCompiler by task<Jar> {
     from {
         fatJarContentsStripMetadata.files.map {
             zipTree(it).matching { exclude("META-INF/jb/**", "META-INF/LICENSE") }
+        }
+    }
+
+    dependsOn(fatJarContentsStripVersions)
+    from {
+        fatJarContentsStripVersions.files.map {
+            zipTree(it).matching { exclude("META-INF/versions/**") }
         }
     }
 }
