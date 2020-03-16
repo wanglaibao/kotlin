@@ -193,6 +193,7 @@ class ExpressionsConverter(
         lateinit var operationTokenName: String
         var leftArgNode: LighterASTNode? = null
         var rightArgAsFir: FirExpression = buildErrorExpression(null, FirSimpleDiagnostic("No right operand", DiagnosticKind.Syntax))
+        var rightArg: LighterASTNode? = null
         binaryExpression.forEachChildren {
             when (it.tokenType) {
                 OPERATION_REFERENCE -> {
@@ -204,6 +205,7 @@ class ExpressionsConverter(
                         leftArgNode = it
                     } else {
                         rightArgAsFir = getAsFirExpression(it, "No right operand")
+                        rightArg = it
                     }
                 }
             }
@@ -242,7 +244,7 @@ class ExpressionsConverter(
         } else {
             val firOperation = operationToken.toFirOperation()
             if (firOperation in FirOperation.ASSIGNMENTS) {
-                return leftArgNode.generateAssignment(null, rightArgAsFir, firOperation) { getAsFirExpression(this) }
+                return leftArgNode.generateAssignment(null, rightArg, rightArgAsFir, firOperation) { getAsFirExpression(this) }
             } else {
                 buildOperatorCall {
                     source = binaryExpression.toFirSourceElement()
