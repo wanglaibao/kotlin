@@ -6,13 +6,24 @@
 package org.jetbrains.kotlin.fir.declarations
 
 import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.Visibilities
+import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.FirSourceElement
 import org.jetbrains.kotlin.fir.declarations.builder.AbstractFirRegularClassBuilder
 import org.jetbrains.kotlin.fir.declarations.builder.FirTypeParameterBuilder
+import org.jetbrains.kotlin.fir.declarations.builder.buildProperty
+import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
+import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.symbols.impl.FirAnonymousObjectSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType
+import org.jetbrains.kotlin.fir.types.FirTypeRef
+import org.jetbrains.kotlin.fir.types.builder.buildImplicitTypeRef
 import org.jetbrains.kotlin.fir.types.coneTypeSafe
+import org.jetbrains.kotlin.name.Name
 
 fun FirTypeParameterBuilder.addDefaultBoundIfNecessary() {
     if (bounds.isEmpty()) {
@@ -73,3 +84,24 @@ fun FirRegularClass.collectEnumEntries(): Collection<FirEnumEntry> {
     assert(classKind == ClassKind.ENUM_CLASS)
     return declarations.filterIsInstance<FirEnumEntry>()
 }
+
+fun generateTemporaryVariable(
+    session: FirSession, source: FirSourceElement?, name: Name, initializer: FirExpression, typeRef: FirTypeRef? = null,
+): FirVariable<*> =
+    buildProperty {
+        this.source = source
+        this.session = session
+        returnTypeRef = typeRef ?: buildImplicitTypeRef {
+            this.source = source
+        }
+        this.name = name
+        this.initializer = initializer
+        symbol = FirPropertySymbol(name)
+        isVar = false
+        isLocal = true
+        status = FirDeclarationStatusImpl(Visibilities.LOCAL, Modality.FINAL)
+    }
+
+fun generateTemporaryVariable(
+    session: FirSession, source: FirSourceElement?, specialName: String, initializer: FirExpression,
+): FirVariable<*> = generateTemporaryVariable(session, source, Name.special("<$specialName>"), initializer)

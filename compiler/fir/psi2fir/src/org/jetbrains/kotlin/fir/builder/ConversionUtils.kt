@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.fir.declarations.builder.FirPropertyBuilder
 import org.jetbrains.kotlin.fir.declarations.builder.buildProperty
 import org.jetbrains.kotlin.fir.declarations.builder.buildPropertyAccessor
 import org.jetbrains.kotlin.fir.declarations.builder.buildValueParameter
+import org.jetbrains.kotlin.fir.declarations.generateTemporaryVariable
 import org.jetbrains.kotlin.fir.declarations.impl.FirDeclarationStatusImpl
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyAccessor
 import org.jetbrains.kotlin.fir.diagnostics.DiagnosticKind
@@ -374,27 +375,6 @@ internal fun generateDestructuringBlock(
         }
     }
 }
-
-fun generateTemporaryVariable(
-    session: FirSession, source: FirSourceElement?, name: Name, initializer: FirExpression, typeRef: FirTypeRef? = null,
-): FirVariable<*> =
-    buildProperty {
-        this.source = source
-        this.session = session
-        returnTypeRef = typeRef ?: buildImplicitTypeRef {
-            this.source = source
-        }
-        this.name = name
-        this.initializer = initializer
-        symbol = FirPropertySymbol(name)
-        isVar = false
-        isLocal = true
-        status = FirDeclarationStatusImpl(Visibilities.LOCAL, Modality.FINAL)
-    }
-
-fun generateTemporaryVariable(
-    session: FirSession, source: FirSourceElement?, specialName: String, initializer: FirExpression,
-): FirVariable<*> = generateTemporaryVariable(session, source, Name.special("<$specialName>"), initializer)
 
 fun FirPropertyBuilder.generateAccessorsByDelegate(
     delegateBuilder: FirWrappedDelegateExpressionBuilder?,
