@@ -61,7 +61,13 @@ class XDebuggerTreeSelectedNodeListener(val session: XDebugSession, val tree: XD
                     is RunningCoroutineStackFrameItem -> {
                         val threadProxy = stackFrameItem.frame.threadProxy()
                         val isCurrentContext = suspendContext.thread == threadProxy
-                        createStackAndSetFrame(threadProxy, { stackFrameItem.stackFrame }, isCurrentContext)
+                        val executionStack = JavaExecutionStack(
+                            threadProxy,
+                            debugProcess,
+                            isCurrentContext
+                        )
+                        val jStackFrame = executionStack.createStackFrame(stackFrameItem.frame)
+                        createStackAndSetFrame(threadProxy, { jStackFrame }, isCurrentContext)
                     }
                     is CreationCoroutineStackFrameItem -> {
                         val position = stackFrameItem.stackTraceElement.findPosition(session.project) ?: return false

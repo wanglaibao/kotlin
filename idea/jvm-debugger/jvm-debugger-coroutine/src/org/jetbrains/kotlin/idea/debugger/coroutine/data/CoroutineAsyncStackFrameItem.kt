@@ -43,7 +43,7 @@ class SuspendCoroutineStackFrameItem(
 
 class RunningCoroutineStackFrameItem(
     val frame: StackFrameProxyImpl,
-    val stackFrame: XStackFrame,
+//    val stackFrame: XStackFrame,
     spilledVariables: List<XNamedValue> = emptyList()
 ) : CoroutineStackFrameItem(frame.location(), spilledVariables)
 

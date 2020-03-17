@@ -36,14 +36,11 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
 
         if (coroutine.isRunning() && coroutine.activeThread is ThreadReference) {
             val threadReferenceProxyImpl = ThreadReferenceProxyImpl(debugProcess.virtualMachineProxy, coroutine.activeThread)
-            val executionStack = JavaExecutionStack(threadReferenceProxyImpl, debugProcess, suspendedSameThread(coroutine.activeThread))
 
             val realFrames = threadReferenceProxyImpl.forceFrames()
             var coroutineStackInserted = false
             var preflightFound = false
-            for (i in 0 until realFrames.size) {
-                val runningStackFrameProxy = realFrames[i]
-                val jStackFrame = executionStack.createStackFrame(runningStackFrameProxy)
+            for (runningStackFrameProxy in realFrames) {
                 if (runningStackFrameProxy.location().isPreFlight()) {
                     preflightFound = true
                     continue
@@ -67,12 +64,7 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
                     preflightFound = false
                 }
                 if (!(coroutineStackInserted && isInvokeSuspendNegativeLineMethodFrame(runningStackFrameProxy)))
-                    coroutineStackFrameList.add(
-                        RunningCoroutineStackFrameItem(
-                            runningStackFrameProxy,
-                            jStackFrame
-                        )
-                    )
+                    coroutineStackFrameList.add(RunningCoroutineStackFrameItem(runningStackFrameProxy))
                 coroutineStackInserted = false
             }
         } else if ((coroutine.isSuspended() || coroutine.activeThread == null) && coroutine.lastObservedFrameFieldRef is ObjectReference)
@@ -82,12 +74,6 @@ class CoroutineBuilder(val suspendContext: SuspendContextImpl) {
         coroutine.stackFrameList.addAll(coroutineStackFrameList)
         return coroutineStackFrameList
     }
-
-    private fun suspendedSameThread(activeThread: ThreadReference) =
-        activeThread == suspendContext.thread?.threadReference
-
-
-
 
     private fun isInvokeSuspendNegativeLineMethodFrame(frame: StackFrameProxyImpl) =
         frame.safeLocation()?.safeMethod()?.name() == "invokeSuspend" &&
