@@ -97,6 +97,15 @@ internal fun AbstractArchiveTask.setArchiveClassifierCompatible(classifierProvid
     }
 }
 
+internal fun AbstractArchiveTask.setArchiveExtensionCompatible(extensionProvider: () -> String) {
+    if (isGradleVersionAtLeast(5, 2)) {
+        archiveExtension.set(project.provider { extensionProvider() })
+    } else {
+        @Suppress("DEPRECATION")
+        extension = extensionProvider()
+    }
+}
+
 internal fun IvyArtifactRepository.patternLayoutCompatible(config: IvyPatternRepositoryLayout.() -> Unit) {
     if (isGradleVersionAtLeast(5, 0)) {
         patternLayout(config)
